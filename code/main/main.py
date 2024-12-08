@@ -55,6 +55,7 @@ import yaml
     # 19            -> 13 Right-shoe
     # 3, 8, 11      -> 14 Accessories
 
+import matplotlib.pyplot as plt
 
 def train(config):
     # Local weight and sample directories
@@ -135,6 +136,7 @@ def train(config):
         print("=> No checkpoint found. Starting training from scratch.")
 
     board = SummaryWriter(run_dir)
+    epoch_losses = []  # List to store loss values for plotting
 
     for epoch in range(start_epoch, config['TRAINING_CONFIG']['EPOCH']):
         print("epoch: " + str(epoch + 1))
@@ -172,6 +174,13 @@ def train(config):
 
             epoch_loss += loss_G.item()  # Accumulate generator loss
 
+        # Log loss for TensorBoard
+        avg_epoch_loss = epoch_loss / len(dataloader)
+        board.add_scalar('Loss/train', avg_epoch_loss, epoch)
+
+        # Store loss values for plotting
+        epoch_losses.append(avg_epoch_loss)
+
         # Save checkpoint
         save_info = {
             'epoch': epoch + 1,
@@ -188,13 +197,20 @@ def train(config):
         torch.save(save_info, weight_path)  # Save latest checkpoint locally
 
         # Save best model
-        avg_epoch_loss = epoch_loss / len(dataloader)
         if avg_epoch_loss < best_score:
             best_score = avg_epoch_loss
             save_info['best_score'] = best_score
             torch.save(save_info, best_model_path)  # Save best model locally
             torch.save(save_info, best_drive_path)  # Save best model to Google Drive
             print(f"Best model updated with loss {best_score:.4f} and saved to Google Drive.")
+
+    # After training, plot the loss curve
+    plt.plot(range(len(epoch_losses)), epoch_losses)
+    plt.title('Training Loss Curve')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.show()
+
 
 def test(opt):
     record_file = os.path.join('result', config['TRAINING_CONFIG']['TRAIN_DIR'], 'FID_score_{}.txt'.format(config['MODE']))
